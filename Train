@@ -1,0 +1,56 @@
+import pandas as pd
+import numpy as np
+import lightgbm as lgb
+import pickle
+
+# 1. Load Data
+# (Make sure these paths match your local setup)
+train = pd.read_csv("train.csv")
+TARGET = "FloodProbability"
+
+X = train.drop(columns=[TARGET])
+y = train[TARGET].values
+
+# 2. Feature Engineering (Must match the notebook exactly)
+def add_row_stats(df):
+    df = df.copy()
+    num = df.select_dtypes(include=[np.number])
+    df["row_mean"] = num.mean(axis=1)
+    df["row_std"]  = num.std(axis=1)
+    df["row_min"]  = num.min(axis=1)
+    df["row_max"]  = num.max(axis=1)
+    df["row_sum"]  = num.sum(axis=1)
+    return df
+
+print("Feature Engineering...")
+X_fe = add_row_stats(X)
+
+# 3. Train Model (Full dataset, no CV needed for final production model)
+# Using the parameters from your notebook
+lgb_params = {
+    "objective": "regression",
+    "metric": "rmse",
+    "boosting_type": "gbdt",
+    "learning_rate": 0.03,
+    "num_leaves": 256,
+    "min_data_in_leaf": 80,
+    "feature_fraction": 0.85,
+    "bagging_fraction": 0.85,
+    "bagging_freq": 1,
+    "lambda_l1": 0.0,
+    "lambda_l2": 2.0,
+    "verbosity": -1,
+    "seed": 42,
+}
+
+print("Training LightGBM on full dataset...")
+dtrain = lgb.Dataset(X_fe, label=y)
+model = lgb.train(
+    lgb_params,
+    dtrain,
+    num_boost_round=2000 
+)
+
+# 4. Save the model
+model.save_model('lgb_flood_model.txt')
+print("Model saved as 'lgb_flood_model.txt' ✅")
